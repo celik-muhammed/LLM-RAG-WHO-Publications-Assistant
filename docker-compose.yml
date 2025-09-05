@@ -1,0 +1,95 @@
+
+networks:
+  # Define the network globally
+  back-tier:
+    driver: bridge
+
+volumes:
+  ollama_data:  # locally phi3 model ~2gb
+  # postgres_data:  # store questions ad feedbacks
+
+services:
+
+
+  ollama:
+    tty: true
+    stdin_open: true
+    restart: always
+    image: "ollama/ollama:latest"
+    container_name: ollama
+    pull_policy: always
+    volumes:
+      - ollama_data:/root/.ollama  # put downloaded models
+      - ./ollama_init/entrypoint.sh:/root/entrypoint.sh  # script pull phi3 model and serve
+    ports:
+      - "11434:11434"
+    networks:
+      - back-tier  # Ensure network is correctly referenced
+    entrypoint: ["/usr/bin/bash", "/root/entrypoint.sh"]  # script pull phi3 model and serve
+    # healthcheck:
+    #   # test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+    #   test: ["CMD", "curl", "-f", "http://localhost:11434/"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 30
+    #   start_period: 60s
+    # https://ollama.com/library/phi3
+
+
+  postgres:
+    image: postgres_vector
+    container_name: "postgres_vector"
+    env_file:
+      - .env
+    # environment:
+    #   POSTGRES_DB: "${POSTGRES_DB:-llm_rag}"
+    #   POSTGRES_HOST: ${POSTGRES_HOST}
+    #   POSTGRES_USER: "${POSTGRES_USER:-admin}"
+    #   POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-admin}"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      # See: https://gist.github.com/onjin/2dd3cc52ef79069de1faa2dfd456c945
+      - ./postgres_init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - back-tier  # Ensure network is correctly referenced
+  
+  
+  adminer:
+    restart: unless-stopped
+    image: "adminer:latest"
+    container_name: "adminer"
+    # env_file:
+    #   - .env
+    environment:
+      ADMINER_PORT: "${ADMINER_PORT:-9002}"
+    ports:
+      ## External Access: Used to specify port mappings between the Docker host and the container.
+      ## "<host_port>:<container_port>"
+      - "${ADMINER_PORT:-8080}:8080"
+    networks:
+      - "back-tier"
+    depends_on:
+      - postgres
+
+
+  rag_app:
+    tty: true
+    stdin_open: true
+    image: rag
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-llm_rag}"
+      POSTGRES_HOST: "${POSTGRES_HOST:-postgres}"
+      POSTGRES_USER: "${POSTGRES_USER:-admin}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-admin}"
+    volumes:
+      - ./.env:/app/.env
+      - ./rag.py:/app/rag.py
+    networks:
+      - back-tier  # Ensure network is correctly referenced
+    command: ["python", "/app/rag.py"]
+    depends_on:
+      - postgres
+
+  
