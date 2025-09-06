@@ -1,3 +1,7 @@
+"""
+Ingest pdfs then convert embedding to save database.
+"""
+
 try:
     from config import SETTINGS  # Settings: API_KEY, MODEL_EMBED, BASE_URL, etc.
     from db import create_table, insert_chunks

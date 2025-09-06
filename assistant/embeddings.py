@@ -122,7 +122,7 @@ def generate_completion(
 
 
 def generate_embedding(
-    texts: list[str],
+    texts: "str | list[str]",
 ) -> list[float]:
     """
     Generate embeddings for one or more texts using:

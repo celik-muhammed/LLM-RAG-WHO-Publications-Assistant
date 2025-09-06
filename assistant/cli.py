@@ -31,6 +31,7 @@ def cli():
 @cli.command()
 @click.option(
     "--query", "-q", prompt="Your question",
+    default="adult population in Ukraine", show_default=True,
     help="Your natural language question for the assistant."
 )
 @click.option(
@@ -83,9 +84,10 @@ def ask(query: str, top_k: int):
         click.echo("Best chunk not found in DB.")
 
     # Step 5: Generate model response
-    answer = generate_completion(query, context)
     # click.echo(f"\nAssistant:\n{answer}")
     click.echo("\n=== Assistant Answer ===\n")
+    # Call RAG model
+    answer = generate_completion(query, context)
     click.echo(answer)
 
 

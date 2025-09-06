@@ -28,10 +28,13 @@ RUN pip install uv
 
 # Copy the requirements.txt file into the container
 COPY requirements.txt .
+# COPY assistant /app
 
 # Install all dependencies from requirements.txt
 RUN uv pip install -r requirements.txt --system
 
+EXPOSE 5000
 
-# Command to execute rag.py
-# CMD ["python", "rag.py"]
+# Command to execute app.py
+# CMD ["python", "app.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "1200", "app:app"]

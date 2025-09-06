@@ -86,11 +86,13 @@ services:
       POSTGRES_USER: "${POSTGRES_USER:-admin}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-admin}"
     volumes:
-      - ./.env:/app/.env
-      - ./assistant:/app/assistant
+      # - ./.env:/app/.env
+      - ./assistant:/app
+    ports:
+      - "${APP_PORT:-5000}:5000"
     networks:
       - back-tier  # Ensure network is correctly referenced
-    command: ["python", "/app/rag.py"]
+    command: ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "1200", "app:app"]
     depends_on:
       - postgres
 
