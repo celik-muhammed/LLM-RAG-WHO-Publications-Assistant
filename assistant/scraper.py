@@ -101,7 +101,7 @@ def fetch_links_selenium(
                 href = a.get_attribute("href")
                 if href:
                     links.add(href)  # Keep only unique URLs
-            print(f"Loaded page {page}...{len(links)} .pdf in set.")
+            logger.info(f"Loaded page: {page} found: {len(links)} .pdf in set.")
             # Attempt to click 'Next' button if exists
             try:
                 next_btn = driver.find_element(By.CSS_SELECTOR, 'a[aria-label="Go to the next page"]')
@@ -113,12 +113,12 @@ def fetch_links_selenium(
             break  # Timeout or other Selenium errors; exit
     driver.quit()
     # Optionally save links to JSON
-    if save_json:
+    if save_json and links:
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         file_path = Path(output_dir) / 'pdfs_link_who.json'
         with open(file_path, 'wt', encoding='utf-8') as jsonf:
             json.dump({'urls': sorted(links)}, jsonf, indent=2, ensure_ascii=False)
-    logger.info(f"{len(sorted(links))} fetched .pdf links!")
+    logger.info(f"Totally fetched/scraped {len(sorted(links))} .pdf links!")
     return sorted(links)
 
 
@@ -175,8 +175,11 @@ def download_pdfs(
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     if urls is None:  # Load from default JSON if None
-        with open(f'{output_dir}/pdf_links_who.json', 'rt') as f_in:
-            urls = json.load(f_in)["urls"]
+        try:
+            with open(f'{output_dir}/pdf_links_who.json', 'rt') as f_in:
+                urls = json.load(f_in)["urls"]
+        except Exception:
+            urls = []
 
     if isinstance(urls, str):
         urls = [urls]

@@ -126,6 +126,9 @@ def split_into_chunks(
     text: str,
     max_tokens: int = SETTINGS.CHUNK_MAX_TOKENS,
     overlap: int = SETTINGS.CHUNK_OVERLAP_TOKENS,
+    source_link: str = "",
+    source_name : str = "",
+    source_note: str = "",
 ) -> "list[dict[str, Optional[str]]]":
     """
     Split text into structured chunks by heading, bullet points, and paragraphs.
@@ -160,9 +163,12 @@ def split_into_chunks(
         # Split the paragraph into smaller chunks based on max_tokens and overlap
         for sub in split_large_paragraph(para_text, max_tokens, overlap):
             chunks.append({
-                "section": section,      # Associate chunk with current section
                 "type": "paragraph",     # Mark type as Paragraph type
-                "content": sub           # Store chunk text
+                "section": section,      # Associate chunk with current section
+                "content": sub,          # Store chunk text
+                "source_link": source_link,          # Store source_link
+                "source_name": source_name,          # Store source_name
+                "source_note": source_note,          # Store source_note
             })
 
         # Clear the current paragraph buffer
@@ -180,9 +186,12 @@ def split_into_chunks(
             # New heading detected
             section = m_h.group("heading")  # Update current section
             chunks.append({
-                "section": section,
                 "type": "heading",
-                "content": line  # Store heading line
+                "section": section,
+                "content": line,  # Store heading line
+                "source_link": source_link,          # Store source_link
+                "source_name": source_name,          # Store source_name
+                "source_note": source_note,          # Store source_note
             })
             continue  # Move to next line
 
@@ -191,9 +200,12 @@ def split_into_chunks(
         if m_b:  # Bullet detected
             flush_paragraph()  # Save any previous paragraph
             chunks.append({
-                "section": section,
                 "type": "bullet",
-                "content": m_b.group("bullet")  # Store bullet text only
+                "section": section,
+                "content": m_b.group("bullet"),  # Store bullet text only
+                "source_link": source_link,          # Store source_link
+                "source_name": source_name,          # Store source_name
+                "source_note": source_note,          # Store source_note
             })
             continue  # Move to next line
 

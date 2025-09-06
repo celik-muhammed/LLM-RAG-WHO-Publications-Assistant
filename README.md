@@ -17,7 +17,7 @@ This project:
 * Breaks them into structured chunks
 * An API key from OpenAI 
 * Embeds them (OpenAI or Ollama)
-* Stores in Postgres + pgvector (time (approx 30-60 Minutes) depening on your system)
+* Stores in Postgres + pgvector (time (approx 30-90 Minutes) depening on your system)
 * Lets you query using cosine, Euclidean (FAISS), dot-product, or Canberra distance
 * Combines results to give the best chunk as LLM context
 
@@ -98,13 +98,15 @@ Optional:
 Ingest WHO reports
 
 ```sh
-python -m assistant.cli ingest -
+# Ingest WHO reports
+python assistant/pipeline.py
 ```
 
 Ask questions
 
 ```sh
-python -m assistant.cli ask -q "What are the latest vaccination coverage rates?" -k 5
+# Ask questions
+python assistant/cli.py ask -q "adult population in Ukraine"
 ```
 
 ## 🏗️ Architecture Diagram

@@ -42,11 +42,14 @@ def create_table():
             vector VECTOR(768),           -- (1536) pgvector column adjust this based on your OpenAI model
             hash TEXT UNIQUE,             -- content hash for deduplication
             group_id INT,
+            source_link TEXT,
+            source_name TEXT,
+            source_note TEXT,
             timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
         ''')
         conn.commit()
-    logger.info(f"{SETTINGS.POSTGRES_TABLE} Table created!")
+        logger.info(f"{SETTINGS.POSTGRES_TABLE} Table created if not exist!")
 
 
 def insert_chunks(chunks, group_id: int):
@@ -67,8 +70,16 @@ def insert_chunks(chunks, group_id: int):
             # Compute hash for deduplication
             h = hash_text(section_content)
             # Append row tuple
-            rows.append((section_content, chunk['type'], vec, h, group_id))
-
+            rows.append((
+                section_content,
+                chunk['type'],
+                vec,
+                h,
+                group_id,
+                chunk['source_link'],
+                chunk['source_name'],
+                chunk['source_note'],
+            ))
             # cur.execute('''
             #     INSERT INTO text_chunks (section_content, type, vector, hash, group_id)
             #     VALUES (%s, %s, %s, %s, %s)
@@ -78,9 +89,9 @@ def insert_chunks(chunks, group_id: int):
         
         # Batch insert using execute_values
         execute_values(cur, f'''
-            INSERT INTO {SETTINGS.POSTGRES_TABLE} (section_content, type, vector, hash, group_id)
+            INSERT INTO {SETTINGS.POSTGRES_TABLE} (section_content, type, vector, hash, group_id, source_link, source_name, source_note)
             VALUES %s
             ON CONFLICT (hash) DO NOTHING;
         ''', rows)
         conn.commit()
-        logger.info(f"{SETTINGS.POSTGRES_TABLE} Vector data added!")
+        logger.info(f"(Group {group_id}) In table: {SETTINGS.POSTGRES_TABLE} All Embedding/Vector data added!")

@@ -35,6 +35,17 @@ def _to_numpy_vector(vec_raw) -> np.ndarray:
     return np.array(vec_raw, dtype=np.float32)  # Already list-like
 
 
+def _fetch_vectors():
+    """
+    Fetch all stored vectors and metadata from Postgres.
+    Returns: list of (id, text, vector_raw, group_id).
+    """
+    with psycopg2.connect(**DB_CONFIG) as conn, conn.cursor() as cur:
+        # Fetch vectors and their corresponding text chunks from the database
+        cur.execute(f"SELECT id, section_content, vector, group_id, source_link, source_name, source_note FROM {SETTINGS.POSTGRES_TABLE}")
+        rows = cur.fetchall()
+        return rows
+
 # ---------------------------
 # Postgres scipy cosine search
 # ---------------------------
@@ -43,40 +54,29 @@ def search_scipy_cosine(query_vector, top_n=5):
     Compute cosine similarity in Python (scipy) directly from vectors stored in Postgres.
     NOTE: Scales poorly with many rows → consider FAISS or pgvector SQL ops for production.
     """
-    with psycopg2.connect(**DB_CONFIG) as conn, conn.cursor() as cur:
-        # Fetch vectors and their corresponding text chunks from the database
-        cur.execute(f"SELECT id, section_content, vector, group_id FROM {SETTINGS.POSTGRES_TABLE}")
-        rows = cur.fetchall()
+    rows = _fetch_vectors()
+    if not rows:
+        return []
 
-        # Normalize query vector
-        query_vector = normalize_vector(np.array(query_vector, dtype=np.float32))
-        # Calculate cosine similarity between query vector and each chunk vector
-        similarities = []
-        for row in rows:
-            chunk_id, section_content, vec_raw_str, group_id = row
-            # Convert string representation of vector to numpy array
-            chunk_vector = normalize_vector(_to_numpy_vector(vec_raw_str))
-            # scipy cosine returns distance, so subtract from 1 to get similarity
-            similarity = 1 - cosine(query_vector, chunk_vector)
-            similarities.append((chunk_id, section_content, float(similarity), group_id))
+    # Normalize query vector
+    query_vector = normalize_vector(np.array(query_vector, dtype=np.float32))
+    # Calculate cosine similarity between query vector and each chunk vector
+    similarities = []
+    for row in rows:
+        chunk_id, section_content, vec_raw_str, group_id, source_link, source_name, source_note = row
+        # Convert string representation of vector to numpy array
+        chunk_vector = normalize_vector(_to_numpy_vector(vec_raw_str))
+        # scipy cosine returns distance, so subtract from 1 to get similarity
+        similarity = 1 - cosine(query_vector, chunk_vector)
+        similarities.append((chunk_id, section_content, float(similarity), group_id, source_link))
 
-        # Sort descending (higher similarity = better)
-        return sorted(similarities, key=lambda x: x[2], reverse=True)[:top_n]
+    # Sort descending (higher similarity = better)
+    return sorted(similarities, key=lambda x: x[2], reverse=True)[:top_n]
 
 
 # ---------------------------
-# FAISS L2 + dot product
+# FAISS L2
 # ---------------------------
-def _fetch_vectors():
-    """
-    Fetch all stored vectors and metadata from Postgres.
-    Returns: list of (id, text, vector_raw, group_id).
-    """
-    with psycopg2.connect(**DB_CONFIG) as conn, conn.cursor() as cur:
-        cur.execute(f"SELECT id, section_content, vector, group_id FROM {SETTINGS.POSTGRES_TABLE}")
-        rows = cur.fetchall()
-        return rows
-
 def search_faiss_l2(query_vector, top_n=5):
     """
     Euclidean (L2) distance search using FAISS.
@@ -90,10 +90,11 @@ def search_faiss_l2(query_vector, top_n=5):
     d = len(query_vector)  # Dimension of the embeddings
     index = faiss.IndexFlatL2(d)  # Using Euclidean (L2) distance
 
-    vectors, ids, contents, groups = [], [], [], []
+    vectors, ids, contents, groups, source_links = [], [], [], [], []
 
     # Assuming vector_str is a string representation of a list of floats, e.g., "[0.1, 0.2, ...]"
-    for chunk_id, section_content, vec_raw_str, group_id in rows:
+    for row in rows:
+        chunk_id, section_content, vec_raw_str, group_id, source_link, source_name, source_note = row
         try:
             # Safely convert the string representation of the vector to a NumPy array
             chunk_vector = _to_numpy_vector(vec_raw_str)
@@ -109,6 +110,7 @@ def search_faiss_l2(query_vector, top_n=5):
         ids.append(chunk_id)
         contents.append(section_content)
         groups.append(group_id)
+        source_links.append(source_link)
 
     # Convert list to numpy array and check if it's valid
     if not vectors:  # Check if vectors is not empty
@@ -123,8 +125,11 @@ def search_faiss_l2(query_vector, top_n=5):
     distances, indices = index.search(qvec, top_n)
 
     # Convert L2 distance to negative score so "higher is better"
-    return [(ids[i], contents[i], -float(distances[0][n]), groups[i]) for n, i in enumerate(indices[0])]
+    return [(ids[i], contents[i], -float(distances[0][n]), groups[i], source_links[i]) for n, i in enumerate(indices[0])]
 
+# ---------------------------
+# FAISS dot product
+# ---------------------------
 def search_faiss_dot(query_vector, top_n=5):
     """
     Dot-product similarity search using FAISS.
@@ -138,16 +143,18 @@ def search_faiss_dot(query_vector, top_n=5):
     d = len(query_vector)  # Dimension of the embeddings
     index = faiss.IndexFlatIP(d)  # Inner product = dot similarity
 
-    vectors, ids, contents, groups = [], [], [], []
+    vectors, ids, contents, groups, source_links = [], [], [], [], []
 
     # Assuming vector_str is a string representation of a list of floats, e.g., "[0.1, 0.2, ...]"
-    for chunk_id, section_content, vec_raw_str, group_id in rows:
+    for row in rows:
+        chunk_id, section_content, vec_raw_str, group_id, source_link, source_name, source_note = row
         # Safely convert the string representation of the vector to a NumPy array
         vec = normalize_vector(_to_numpy_vector(vec_raw_str))
         vectors.append(vec)
         ids.append(chunk_id)
         contents.append(section_content)
         groups.append(group_id)
+        source_links.append(source_link)
 
     # Convert list to numpy array and add to FAISS
     index.add(np.vstack(vectors).astype(np.float32))
@@ -155,7 +162,7 @@ def search_faiss_dot(query_vector, top_n=5):
     qvec = normalize_vector(np.array(query_vector, dtype=np.float32)).reshape(1, -1)
     sims, indices = index.search(qvec, top_n)
 
-    return [(ids[i], contents[i], float(sims[0][n]), groups[i]) for n, i in enumerate(indices[0])]
+    return [(ids[i], contents[i], float(sims[0][n]), groups[i], source_links[i]) for n, i in enumerate(indices[0])]
 
 
 # ---------------------------
@@ -174,12 +181,16 @@ def search_canberra(query_vector, top_n=5):
     Returns inverted distance (negative) so "higher is better".
     """
     rows = _fetch_vectors()
+    if not rows:
+        return []
+
     # Calculate Canberra distance between query vector and each chunk vector
     sims = []
-    for chunk_id, section_content, vec_raw_str, group_id in rows:
+    for row in rows:
+        chunk_id, section_content, vec_raw_str, group_id, source_link, source_name, source_note = row
         vec = _to_numpy_vector(vec_raw_str)
         dist = _canberra(query_vector, vec)
-        sims.append((chunk_id, section_content, -float(dist), group_id))  # negative for consistency ??
+        sims.append((chunk_id, section_content, -float(dist), group_id, source_link))  # negative for consistency ??
     # Sort by distance (lower is better) and get top N results
     return sorted(sims, key=lambda x: x[2])[:top_n]
 
@@ -194,13 +205,14 @@ def compare_top_ids(scipy_cosine, faiss_l2, faiss_dot, canberra, top_n=5, ensemb
     Returns top combined IDs.
     """
     # Initialize a dictionary to store the total score for each ID
-    id_scores, id_groups = defaultdict(int), {}
+    id_scores, id_groups, source_links = defaultdict(int), {}, {}
     # Function to assign scores based on rank
     def assign(results):
         for rank, r in enumerate(results[:top_n], start=1):
-            chunk_id, _, _, group_id = r
+            chunk_id, _, _, group_id, source_link = r
             id_scores[chunk_id] += top_n - rank + 1  # Higher rank gives higher score (e.g., rank 1 gets top_n points, rank 2 gets top_n-1, etc.)
             id_groups[chunk_id] = group_id
+            source_links[chunk_id] = source_link
     # Merge scores from all methods
     assign(scipy_cosine)
     assign(faiss_l2)
@@ -210,7 +222,7 @@ def compare_top_ids(scipy_cosine, faiss_l2, faiss_dot, canberra, top_n=5, ensemb
     # Sort the IDs by their total score, higher score is better
     # Extract the top 3 IDs based on the highest scores
     top = sorted(id_scores.items(), key=lambda x: -x[1])[:ensemble_top_k]
-    return [(cid, id_groups[cid], score) for cid, score in top]
+    return [(cid, id_groups[cid], score, source_links[cid]) for cid, score in top]
 
 
 # ---------------------------
@@ -254,9 +266,9 @@ def display_results(
     if not results:
         print("No results found.")
         return
-    for i, (chunk_id, section_content, similarity, group_id) in enumerate(results, start=1):
+    for i, (chunk_id, section_content, similarity, group_id, source_link) in enumerate(results, start=1):
         text = section_content.strip().replace("\n", " ")
         if max_text_len and len(text) > max_text_len:
             text = text[:max_text_len] + "..."
-        print(f"{i}. ID: {chunk_id} | {score_label}: {similarity:.4f} | Group_Id: {group_id}")
+        print(f"{i}. ID: {chunk_id} | {score_label}: {similarity:.4f} | Group_Id: {group_id} | Source_Link: {source_link}")
         print(f"   Text: {text}\n")

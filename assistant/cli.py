@@ -75,9 +75,10 @@ def ask(query: str, top_k: int):
 
     # context_text = "\n\n".join(context_chunks)
     best_id = top_ids[0][0]
+    source_link = top_ids[0][-1]
     context = fetch_chunk_by_id(best_id)
     if context:
-        click.echo(f"\n[Best Match: ID {best_id}]")
+        click.echo(f"\n[Best Match: ID {best_id} link {source_link}]")
     else:
         click.echo("Best chunk not found in DB.")
 

@@ -1,18 +1,18 @@
-.PHONY: build_pg_vector build_rag run_rag
+.PHONY: pg rag app
 
 # Build the pg_vector Docker image
-build_pg_vector:
+pg:
 	docker build -f Dockerfile.postgres -t postgres_vector .
 
 # Build the rag Docker image
-build_rag:
+rag:
 	@# $(grep -v '^#' .env | sed 's/^/--build-arg /')
 	@# --build-arg TZ_INFO="$TZ_INFO" \
 	docker build -f Dockerfile.rag -t rag .
 
-# Run the rag_app using Docker Compose
-run_rag:
-	docker compose run rag_app
+# Run the "app" using Docker Compose
+app:
+	docker compose run app
 
-# Build both images and run rag_app
-all: build_pg_vector build_rag run_rag
+# Build both images and run "app"
+all: pg rag app

@@ -34,4 +34,4 @@ RUN uv pip install -r requirements.txt --system
 
 
 # Command to execute rag.py
-CMD ["python", "rag.py"]
+# CMD ["python", "rag.py"]

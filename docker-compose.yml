@@ -74,10 +74,12 @@ services:
       - postgres
 
 
-  rag_app:
+  app:  # LLM RAG
     tty: true
     stdin_open: true
     image: rag
+    # env_file:
+    #   - .env
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-llm_rag}"
       POSTGRES_HOST: "${POSTGRES_HOST:-postgres}"
@@ -85,7 +87,7 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-admin}"
     volumes:
       - ./.env:/app/.env
-      - ./rag.py:/app/rag.py
+      - ./assistant:/app/assistant
     networks:
       - back-tier  # Ensure network is correctly referenced
     command: ["python", "/app/rag.py"]

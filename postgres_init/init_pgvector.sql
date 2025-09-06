@@ -47,15 +47,30 @@ blog post.
 -- https://huggingface.co/nomic-ai/nomic-embed-text-v1.5
 -- ============================================
 
--- Drop tables if they exist
-DROP TABLE IF EXISTS public.items;
-CREATE TABLE IF NOT EXISTS public.items (
-    id BIGSERIAL PRIMARY KEY,
-    content TEXT NOT NULL,             -- Text data to be vectorized
-    embedding VECTOR(768)              -- Embedding vector (update dimension per model)
-    -- created_at TIMESTAMPTZ DEFAULT NOW(),
-    -- updated_at TIMESTAMPTZ DEFAULT NOW()
+-- - Drop tables if they exist
+DROP TABLE IF EXISTS public.text_chunks;
+CREATE TABLE IF NOT EXISTS public.text_chunks (
+    id SERIAL PRIMARY KEY,
+    section_content TEXT NOT NULL,
+    type TEXT,
+    vector VECTOR(768),           -- (1536) pgvector column adjust this based on your OpenAI model
+    hash TEXT UNIQUE,             -- content hash for deduplication
+    group_id INT,
+    source_link TEXT,
+    source_name TEXT,
+    source_note TEXT,
+    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+-- - Drop tables if they exist
+-- DROP TABLE IF EXISTS public.items;
+-- CREATE TABLE IF NOT EXISTS public.items (
+--     id BIGSERIAL PRIMARY KEY,
+--     content TEXT NOT NULL,             -- Text data to be vectorized
+--     embedding VECTOR(768)              -- Embedding vector (update dimension per model)
+--     -- created_at TIMESTAMPTZ DEFAULT NOW(),
+--     -- updated_at TIMESTAMPTZ DEFAULT NOW()
+-- );
 
 -- - Drop tables if they exist
 -- DROP TABLE IF EXISTS public.items_128;

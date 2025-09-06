@@ -5,6 +5,7 @@ import inspect
 from dataclasses import dataclass, fields, field, asdict
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+# import pytz  # requires: pip install pytz
 
 import logging
 # ---------------- Logging ----------------
@@ -116,7 +117,7 @@ class Settings:
     DATA_URL: str = os.getenv("DATA_URL", "https://www.who.int/europe/publications/i")
 
     TZ_INFO: str = os.getenv("TZ", "Europe/Istanbul")
-    TZ_LOCAL: datetime = datetime.now(ZoneInfo(TZ_INFO))
+    TZ_LOCAL: datetime = datetime.now(ZoneInfo(str(TZ_INFO)))  # pytz.timezone("Europe/Istanbul")
     TZ_UTC: datetime = datetime.now(timezone.utc)
         
     # Postgres Configuration
