@@ -1,11 +1,14 @@
+"""
+python app.py                          # uses defaults
+POSTGRES_USER=superuser python app.py  # overrides from env
+"""
 from __future__ import annotations
 
 import os
-import inspect
-from dataclasses import dataclass, fields, field, asdict
+# import inspect
+# import pytz  # requires: pip install pytz
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-# import pytz  # requires: pip install pytz
 
 import logging
 # ---------------- Logging ----------------
@@ -17,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 load_dotenv()
+
+# (stdlib)
+from dataclasses import dataclass, fields, field, asdict
 
 
 @dataclass(frozen=True)
@@ -86,6 +92,7 @@ class Settings:
             for f in fields(cls)
         }
 
+    @staticmethod
     def local_or_docker_service(url="", service=None):
         if os.path.exists('/.dockerenv') and service:
             return url.replace("localhost", service)
@@ -114,11 +121,23 @@ class Settings:
     #     #     raise PermissionError("Access to secret_key is restricted for external use.")
     #     return self.__OPENAI_API_KEY
 
+    # Static per-provider configs
+    DATA_PATH: str = os.getenv("DATA_PATH", "../data/pdfs_link_who.json")
     DATA_URL: str = os.getenv("DATA_URL", "https://www.who.int/europe/publications/i")
 
+    RUN_TIMEZONE_CHECK: str = os.getenv("RUN_TIMEZONE_CHECK", "0")
     TZ_INFO: str = os.getenv("TZ", "Europe/Istanbul")
-    TZ_LOCAL: datetime = datetime.now(ZoneInfo(str(TZ_INFO)))  # pytz.timezone("Europe/Istanbul")
-    TZ_UTC: datetime = datetime.now(timezone.utc)
+
+    # TZ_UTC: datetime = datetime.now(timezone.utc)
+    @property
+    def TZ_UTC(self) -> datetime:
+        """Dynamically get config."""
+        return datetime.now(timezone.utc)
+    # TZ_LOCAL: datetime = datetime.now(ZoneInfo(str(TZ_INFO)))  # pytz.timezone("Europe/Istanbul")
+    @property
+    def TZ_LOCAL(self) -> datetime:
+        """Dynamically get config."""
+        return datetime.now(ZoneInfo(self.TZ_INFO))
         
     # Postgres Configuration
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "llm_rag")
@@ -133,33 +152,25 @@ class Settings:
     GRAFANA_ADMIN_PASSWORD: str = os.getenv("GRAFANA_ADMIN_PASSWORD", "admin")
     GRAFANA_SECRET_KEY: str = os.getenv("GRAFANA_SECRET_KEY", "SECRET_KEY")
 
-    # OpenAI Configuration
-    # Actually hide attribute with __double_underscore (name mangling), _single_underscore signals "protected"
-    OPENAI_API_KEY: str | None = field(default=os.getenv("OPENAI_API_KEY", "sk-..."), metadata={"secret": True}, repr=False)
-    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-    OPENAI_MODEL_EMBED: str = os.getenv("OPENAI_MODEL_EMBED", "text-embedding-3-small")
-    OPENAI_MODEL_CHAT: str = os.getenv("OPENAI_MODEL_CHAT", "gpt-4o-mini")
-
-    # huggingface Configuration
-    HF_TOKEN: str | None = field(default=os.getenv("HF_TOKEN", "sk-..."), metadata={"secret": True}, repr=False)
-    HF_API_KEY: str | None = field(default=os.getenv("HF_TOKEN", "sk-..."), metadata={"secret": True}, repr=False)  # alias
-    HF_BASE_URL: str = os.getenv("HF_BASE_URL", "https://router.huggingface.co/v1")  # for openai
-    HF_MODEL_EMBED: str = os.getenv("HF_MODEL_EMBED", "nomic-ai/nomic-embed-text-v1.5")
-    HF_MODEL_CHAT: str = os.getenv("HF_MODEL_CHAT", "openai/gpt-oss-120b")
-
     # Ollama Configuration
     OLLAMA_API_KEY: str | None = os.getenv("OLLAMA_API_KEY", "ollama")  # dummy key
     OLLAMA_BASE_URL: str = local_or_docker_service(os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"), "ollama")  # "localhost" or "ollama"
     OLLAMA_MODEL_EMBED: str = os.getenv("OLLAMA_MODEL_EMBED", "nomic-embed-text")
     OLLAMA_MODEL_CHAT: str = os.getenv("OLLAMA_MODEL_CHAT", "phi3")
 
-    # LLM RAG MODEL Configuration
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "OLLAMA")  #.lower()  ## OPENAI or OLLAMA or HF
-    API_KEY: str | None = field(default=os.getenv(f"{LLM_PROVIDER}_API_KEY", OLLAMA_API_KEY), metadata={"secret": True}, repr=False)
-    BASE_URL: str = local_or_docker_service(os.getenv(f"{LLM_PROVIDER}_BASE_URL", OLLAMA_BASE_URL), "ollama")
-    MODEL_EMBED: str = os.getenv(f"{LLM_PROVIDER}_MODEL_EMBED", OLLAMA_MODEL_EMBED)
-    MODEL_CHAT: str = os.getenv(f"{LLM_PROVIDER}_MODEL_CHAT", OLLAMA_MODEL_CHAT)
+    # huggingface Configuration
+    HF_TOKEN: str | None = field(default=os.getenv("HF_TOKEN", "hf-..."), metadata={"secret": True}, repr=False)
+    HF_API_KEY: str | None = field(default=os.getenv("HF_TOKEN", "hf-..."), metadata={"secret": True}, repr=False)  # alias
+    HF_BASE_URL: str = os.getenv("HF_BASE_URL", "https://router.huggingface.co/v1")  # for openai chat model
+    HF_MODEL_EMBED: str = os.getenv("HF_MODEL_EMBED", "nomic-ai/nomic-embed-text-v1.5")
+    HF_MODEL_CHAT: str = os.getenv("HF_MODEL_CHAT", "openai/gpt-oss-120b:together")  # explicit define Providers (together, fireworks-ai, groq, ...)
 
+    # OpenAI Configuration
+    # Actually hide attribute with __double_underscore (name mangling), _single_underscore signals "protected"
+    OPENAI_API_KEY: str | None = field(default=os.getenv("OPENAI_API_KEY", "sk-..."), metadata={"secret": True}, repr=False)
+    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    OPENAI_MODEL_EMBED: str = os.getenv("OPENAI_MODEL_EMBED", "text-embedding-3-small")
+    OPENAI_MODEL_CHAT: str = os.getenv("OPENAI_MODEL_CHAT", "gpt-4o-mini")
         
     # Scraper
     TIMEOUT_PDF_REQUEST: int = int(os.getenv("TIMEOUT_PDF_REQUEST", 60))
@@ -173,10 +184,40 @@ class Settings:
     # Features
     ENABLE_FAISS: bool = os.getenv("ENABLE_FAISS", "false").lower() == "true"
 
+    # LLM RAG MODEL Configuration
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "OLLAMA")  #.lower()  ## OPENAI or OLLAMA or HF
+    
+    # API_KEY: str | None = field(default=os.getenv(f"{LLM_PROVIDER}_API_KEY", OLLAMA_API_KEY), metadata={"secret": True}, repr=False)
+    # BASE_URL: str = local_or_docker_service(os.getenv(f"{LLM_PROVIDER}_BASE_URL", OLLAMA_BASE_URL), "ollama")
+    # MODEL_EMBED: str = os.getenv(f"{LLM_PROVIDER}_MODEL_EMBED", OLLAMA_MODEL_EMBED)
+    # MODEL_CHAT: str = os.getenv(f"{LLM_PROVIDER}_MODEL_CHAT", OLLAMA_MODEL_CHAT)
 
-SETTINGS = Settings()  # instance
+    # -------- Computed dynamic properties --------
+    @property
+    def API_KEY(self) -> "str | None":
+        """Dynamically get config based on provider."""
+        return getattr(self, f"{self.LLM_PROVIDER}_API_KEY")
 
-## Database Config
+    @property
+    def BASE_URL(self) -> str:
+        """Dynamically get config based on provider."""
+        return getattr(self, f"{self.LLM_PROVIDER}_BASE_URL")
+
+    @property
+    def MODEL_EMBED(self) -> str:
+        """Dynamically get config based on provider."""
+        return getattr(self, f"{self.LLM_PROVIDER}_MODEL_EMBED")
+
+    @property
+    def MODEL_CHAT(self) -> str:
+        """Dynamically get config based on provider."""
+        return getattr(self, f"{self.LLM_PROVIDER}_MODEL_CHAT")  # or os.getenv(f"{self.LLM_PROVIDER}_MODEL_CHAT")
+
+
+# ✅ Instance
+SETTINGS = Settings()
+
+# ✅ Database config dict
 DB_CONFIG = {
     "database": Settings().POSTGRES_DB,  # "dbname"
     "host": Settings().POSTGRES_HOST,

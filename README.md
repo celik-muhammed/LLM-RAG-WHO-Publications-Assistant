@@ -52,11 +52,11 @@ Optional:
 ## ⚡How to install?
 * Clone this repository
     ```sh
-    git clone https://github.com/yourname/llm-rag-assistant.git
+    git clone https://github.com/celik-muhammed/LLM-RAG-WHO-Publications-Assistant.git
     cd llm-rag-assistant
     ```
 * Make sure you fulfill the requirements from above
-* Environment variables: Create a file `.env` and add the following: `OPENAI_API_KEY=your_key`
+* Environment variables: Change in `docker-compose.yml` or Create a file `.env` and add the following: `OPENAI_API_KEY=your_key`
 * Store `.env` at the root of the repository (the same place where you see all the other files)
     ```sh
     LLM_PROVIDER=OPENAI    # or OLLAMA
@@ -69,7 +69,7 @@ Optional:
 * Currently, data is fetched and ingested into the database. This will take some time (approx 30-60 Minutes) depening on your system. 
 <!-- * If you want to re-run it later, make sure to change in the file `load = yes` to `load = no`. Then the download process will be skipped. You'll not ingest the data twice, if you don't do that, but it still needs the same amount of time. -->
 * Within the same file you'll see `DEFAULT_MAX_PAGES = 1`, which simply means the first page and all reports from there are fetched. You can add more pages, but be aware this will need a lot of time and during the development the web site of the WHO doesn't react from time to time.
-* If you want to re-run, simply execute `make run_rag`
+* If you want to re-run, simply execute `make rag`
     ```sh
     docker-compose up -d
     ```
@@ -96,20 +96,28 @@ Optional:
 
 <p align="center"> <img src="images/text_chunks.png" width="800"> </p>
 
-## ▶️ Usage
+## ▶️ Usage (optionally check [notebook.ipynb](notebook.ipynb))
 
 Ingest WHO reports
 
 ```sh
-# Ingest WHO reports
+# fetch who pdfs push embeddings to db (~90 min depends on host)
+# re-try if Totally fetched/scraped 0 .pdf links!, then check db by adminer
 python assistant/pipeline.py
 ```
 
 Ask questions
 
 ```sh
-# Ask questions
+# Ask questions (ollama ~11 min)
 python assistant/cli.py ask -q "adult population in Ukraine"
+```
+
+UI Streamlit
+
+```sh
+# Ask questions
+streamlit run app_st.py
 ```
 
 <p align="center"> <img src="images/app-streamlit.png" width="800"> </p>

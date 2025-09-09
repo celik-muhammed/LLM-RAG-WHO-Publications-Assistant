@@ -12,7 +12,8 @@ rag:
 
 # Run the "app" using Docker Compose
 app:
-	docker compose run app
+	@# docker compose run app
+	docker compose up -d
 
 # Build both images and run "app"
 all: pg rag app

@@ -45,7 +45,7 @@ class EmbedResult:
 def generate_completion(
     prompt: str,
     context: str = "",
-    temperature: "float" = 0.7,
+    temperature: "float" = 0.8,
     max_tokens: "int | None" = None,
 ) -> str:
     """
@@ -140,17 +140,17 @@ def generate_embedding(
     # --------------------
     ## we'll use REST requests for Ollama
     # Generate embedding for the user's query
-    if SETTINGS.API_KEY == "ollama":
+    if SETTINGS.LLM_PROVIDER in ["OLLAMA", "HF"]:
         results = []
         for t in texts:
             payload = {
                 "prompt": t,  # as str single query, The text to embed
-                "model": SETTINGS.MODEL_EMBED,  # Ollama model
+                "model": SETTINGS.OLLAMA_MODEL_EMBED,  # Ollama model
             }
             # POST request to Ollama embeddings endpoint
             r = requests.post(
                 # url=f"{SETTINGS.BASE_URL}/chat/completions",
-                url=f"{SETTINGS.BASE_URL.replace("v1", '')}api/embeddings",  # Ollama API endpoint
+                url=f"{SETTINGS.OLLAMA_BASE_URL.replace("v1", '')}api/embeddings",  # Ollama API endpoint
                 json=payload,
                 # timeout=60  # Optional: consider adding a timeout
             )
